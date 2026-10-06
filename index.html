@@ -1,0 +1,314 @@
+<html>
+
+<head>
+  <style></style>
+</head>
+
+<body>
+
+<script>
+//-------Hier einfügen-----------------------
+
+// Variablen für den Ball
+let ballX, ballY;
+let ballSpeedX = 4;
+let ballSpeedY = 2;
+let ballSize = 15;
+
+// Spielstand
+let scoreRed = 0;
+let scoreBlue = 0;
+let goalTimer = 0;
+let lastScorer = "";
+
+// Spieler-Positionen (Die Torwarte sind als "isUser: true" markiert)
+let teamRed = [
+  {x: 40, y: 200, hairColor: "#4a3728", isUser: true},    // ROTER TORWART (Pfeiltasten)
+  {x: 230, y: 100, hairColor: "#d4af37", isUser: false},
+  {x: 230, y: 300, hairColor: "#000000", isUser: false},
+  {x: 430, y: 130, hairColor: "#9a3324", isUser: false},
+  {x: 430, y: 270, hairColor: "#4a3728", isUser: false},
+  {x: 600, y: 200, hairColor: "#000000", isUser: false}  
+];
+
+let teamBlue = [
+  {x: 760, y: 200, hairColor: "#000000", isUser: true},   // BLAUER TORWART (W, A, S, D)
+  {x: 570, y: 100, hairColor: "#d4af37", isUser: false},
+  {x: 570, y: 300, hairColor: "#4a3728", isUser: false},
+  {x: 370, y: 130, hairColor: "#000000", isUser: false},
+  {x: 370, y: 270, hairColor: "#d4af37", isUser: false},
+  {x: 200, y: 200, hairColor: "#9a3324", isUser: false}  
+];
+
+function setup() {
+  createCanvas(800, 400);
+  resetBall();
+}
+
+function draw() {
+  drawPitch();
+ 
+  // Tastaturabfragen für beide Spieler
+  handleUserInput();
+ 
+  drawDetailedPlayers();
+  moveBall();
+  checkGoal();
+  drawBall();
+ 
+  // UI Overlays
+  drawScoreboard();
+  drawGoalOverlay();
+}
+
+// Sichere Multi-Player Steuerung
+function handleUserInput() {
+  let speed = 4; // Laufgeschwindigkeit der Keeper
+
+  // --- STEUERUNG ROTER TORWART (Pfeiltasten) ---
+  let gkRed = teamRed[0];
+  if (keyIsDown(LEFT_ARROW))  gkRed.x -= speed;
+  if (keyIsDown(RIGHT_ARROW)) gkRed.x += speed;
+  if (keyIsDown(UP_ARROW))    gkRed.y -= speed;
+  if (keyIsDown(DOWN_ARROW))  gkRed.y += speed;
+ 
+  // Begrenzung: Linke Feldhälfte
+  gkRed.x = constrain(gkRed.x, 15, width / 2 - 20);
+  gkRed.y = constrain(gkRed.y, 15, height - 15);
+
+  // --- NEUE, SICHERE STEUERUNG BLAUER TORWART (W, A, S, D) ---
+  let gkBlue = teamBlue[0];
+ 
+  // Wir prüfen direkt, ob eine Taste gedrückt ist und welchen Buchstaben sie hat
+  if (keyIsPressed) {
+    if (key === 'w' || key === 'W') gkBlue.y -= speed; // Oben
+    if (key === 's' || key === 'S') gkBlue.y += speed; // Unten (Jetzt auf S statt X!)
+    if (key === 'a' || key === 'A') gkBlue.x -= speed; // Links
+    if (key === 'd' || key === 'D') gkBlue.x += speed; // Rechts
+  }
+ 
+  // Begrenzung: Rechte Feldhälfte
+  gkBlue.x = constrain(gkBlue.x, width / 2 + 20, width - 15);
+  gkBlue.y = constrain(gkBlue.y, 15, height - 15);
+}
+
+// Setzt den Ball zurück
+function resetBall() {
+  ballX = width / 2;
+  ballY = height / 2;
+  ballSpeedX = random([-4, 4]);
+  ballSpeedY = random([-2, 2]);
+}
+
+// Überprüfung auf Tore
+function checkGoal() {
+  let goalTop = height / 2 - 30;
+  let goalBottom = height / 2 + 30;
+ 
+  if (ballY > goalTop && ballY < goalBottom) {
+    if (ballX <= 10) {
+      scoreBlue++;
+      lastScorer = "TEAM BLAU";
+      goalTimer = 90;
+      resetBall();
+    }
+    else if (ballX >= width - 10) {
+      scoreRed++;
+      lastScorer = "TEAM ROT";
+      goalTimer = 90;
+      resetBall();
+    }
+  }
+}
+
+// Spielfeld zeichnen
+function drawPitch() {
+  background(34, 139, 34);
+ 
+  stroke(255);
+  strokeWeight(3);
+  noFill();
+ 
+  rect(10, 10, width - 20, height - 20);
+  line(width / 2, 10, width / 2, height - 10);
+  ellipse(width / 2, height / 2, 120, 120);
+  fill(255);
+  ellipse(width / 2, height / 2, 8, 8);
+  noFill();
+ 
+  rect(10, height / 2 - 80, 80, 160);
+  rect(10, height / 2 - 40, 30, 80);
+ 
+  rect(width - 90, height / 2 - 80, 80, 160);
+  rect(width - 40, height / 2 - 40, 30, 80);
+ 
+  stroke(255);
+  strokeWeight(4);
+  line(10, height/2 - 30, 10, height/2 + 30);
+  line(width - 10, height/2 - 30, width - 10, height/2 + 30);
+}
+
+// Zeichnet die Spieler
+function drawDetailedPlayers() {
+  strokeWeight(1);
+  stroke(0);
+ 
+  // Team Rot
+  for (let i = 0; i < teamRed.length; i++) {
+    let player = teamRed[i];
+    let angle = atan2(ballY - player.y, ballX - player.x);
+    let shirtColor = (i === 0) ? color(255, 140, 0) : color(220, 20, 60);
+    let indicatorColor = color(255, 215, 0, 150);
+   
+    drawPerson(player.x, player.y, shirtColor, player.hairColor, angle, player.isUser, indicatorColor);
+  }
+ 
+  // Team Blau
+  for (let i = 0; i < teamBlue.length; i++) {
+    let player = teamBlue[i];
+    let angle = atan2(ballY - player.y, ballX - player.x);
+    let shirtColor = (i === 0) ? color(50, 205, 50) : color(30, 144, 255);
+    let indicatorColor = color(0, 255, 255, 150);
+   
+    drawPerson(player.x, player.y, shirtColor, player.hairColor, angle, player.isUser, indicatorColor);
+  }
+}
+
+// Personen-Zeichenfunktion
+function drawPerson(x, y, shirtColor, hairColor, angle, isUser, indicatorColor) {
+  push();
+  translate(x, y);
+  rotate(angle + HALF_PI);
+ 
+  if (isUser) {
+    push();
+    noStroke();
+    fill(indicatorColor);
+    ellipse(0, 0, 42, 42);
+    pop();
+  }
+ 
+  fill(shirtColor);
+  ellipse(0, 0, 32, 18);
+ 
+  fill(255, 219, 172);
+  ellipse(0, 0, 14, 14);
+ 
+  fill(hairColor);
+  noStroke();
+  arc(0, 2, 14, 10, 0, PI, CHORD);
+ 
+  pop();
+}
+
+// Ballbewegung
+function moveBall() {
+  ballX += ballSpeedX;
+  ballY += ballSpeedY;
+ 
+  let goalTop = height / 2 - 30;
+  let goalBottom = height / 2 + 30;
+ 
+  if (ballX - ballSize/2 <= 10 || ballX + ballSize/2 >= width - 10) {
+    if (ballY < goalTop || ballY > goalBottom) {
+      ballSpeedX *= -1;
+      ballX = constrain(ballX, 10 + ballSize/2, width - 10 - ballSize/2);
+    }
+  }
+ 
+  if (ballY - ballSize/2 <= 10 || ballY + ballSize/2 >= height - 10) {
+    ballSpeedY *= -1;
+    ballY = constrain(ballY, 10 + ballSize/2, height - 10 - ballSize/2);
+  }
+ 
+  checkPlayerKick(teamRed);
+  checkPlayerKick(teamBlue);
+}
+
+// Abprallen/Kicken
+function checkPlayerKick(team) {
+  for (let player of team) {
+    let d = dist(ballX, ballY, player.x, player.y);
+    if (d < 26) {
+      ballSpeedX = (ballX > player.x) ? abs(ballSpeedX) : -abs(ballSpeedX);
+      ballSpeedX *= 1.05;
+      ballSpeedY += random(-2, 2);
+     
+      ballSpeedX = constrain(ballSpeedX, -9, 9);
+      ballSpeedY = constrain(ballSpeedY, -6, 6);
+    }
+  }
+}
+
+// Ball anzeigen
+function drawBall() {
+  fill(255);
+  stroke(0);
+  strokeWeight(1);
+  ellipse(ballX, ballY, ballSize, ballSize);
+ 
+  line(ballX - 3, ballY, ballX + 3, ballY);
+  line(ballX, ballY - 3, ballX, ballY + 3);
+}
+
+// Anzeigetafel
+function drawScoreboard() {
+  push();
+  fill(0, 150);
+  noStroke();
+  rect(width / 2 - 70, 15, 140, 40, 5);
+ 
+  textAlign(CENTER, CENTER);
+  textSize(20);
+  textStyle(BOLD);
+ 
+  fill(255, 100, 100);
+  text(scoreRed, width / 2 - 35, 35);
+ 
+  fill(255);
+  text(":", width / 2, 33);
+ 
+  fill(100, 100, 255);
+  text(scoreBlue, width / 2 + 35, 35);
+  pop();
+}
+
+// Tor-Animation
+function drawGoalOverlay() {
+  if (goalTimer > 0) {
+    push();
+    fill(0, 0, 0, 100);
+    rect(0, 0, width, height);
+   
+    textAlign(CENTER, CENTER);
+    textSize(60);
+    textStyle(BOLD);
+    fill(255, 215, 0);
+    stroke(0);
+    strokeWeight(5);
+    text("GOAL!!!", width / 2, height / 2 - 20);
+   
+    textSize(24);
+    fill(255);
+    noStroke();
+    text("Tor für " + lastScorer, width / 2, height / 2 + 40);
+    pop();
+   
+    goalTimer--;
+  }
+}
+
+
+
+
+//-------Bis hier einfügen-----------------------
+</script>
+
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js">
+<script src="https://cdn.jsdelivr.net/npm/p5@2.3.2/lib/p5.js">
+
+</script>
+
+</body>
+
+</html>
